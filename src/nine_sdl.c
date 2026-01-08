@@ -17,16 +17,20 @@
 
 #include <d3dadapter/drm.h>
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_syswm.h>
+#include <SDL3/SDL.h>
+//#include <SDL3/SDL_syswm.h>
 
 #include "dri3.h"
 
 // ----------- utils funcs / stubs ------------------------
 #define TRACE(...)
-#define FIXME(...)   fprintf(stderr, __VA_ARGS__)
-#define WARN(...)   fprintf(stderr, __VA_ARGS__)
-#define ERR(...)    fprintf(stderr, __VA_ARGS__)
+//#define FIXME(...)   fprintf(stderr, __VA_ARGS__)
+//#define WARN(...)   fprintf(stderr, __VA_ARGS__)
+//#define ERR(...)    fprintf(stderr, __VA_ARGS__)
+// disable
+#define FIXME(...)
+#define WARN(...)
+#define ERR(...)
 
 static inline BOOL IsEqualGUID(const GUID* a, const GUID* b)
 {
@@ -57,10 +61,10 @@ static const D3DFORMAT ConvertFromSDL(Uint32 format)
     case SDL_PIXELFORMAT_ARGB4444:      return D3DFMT_A4R4G4B4;
     case SDL_PIXELFORMAT_RGB332:        return D3DFMT_R3G3B2;
     case SDL_PIXELFORMAT_ARGB1555:      return D3DFMT_A1R5G5B5;
-    case SDL_PIXELFORMAT_RGB555:        return D3DFMT_X1R5G5B5;
+    case SDL_PIXELFORMAT_XRGB1555:        return D3DFMT_X1R5G5B5;
     case SDL_PIXELFORMAT_RGB565:        return D3DFMT_R5G6B5;
     case SDL_PIXELFORMAT_RGB24:         return D3DFMT_R8G8B8;
-    case SDL_PIXELFORMAT_RGB888:        return D3DFMT_X8R8G8B8;
+    case SDL_PIXELFORMAT_XRGB8888:        return D3DFMT_X8R8G8B8;
     case SDL_PIXELFORMAT_ARGB8888:      return D3DFMT_A8R8G8B8;
     case SDL_PIXELFORMAT_ARGB2101010:   return D3DFMT_A2R10G10B10;
     default:
@@ -76,10 +80,10 @@ static const Uint32 ConvertToSDL(D3DFORMAT format)
     case D3DFMT_A4R4G4B4:     return SDL_PIXELFORMAT_ARGB4444;
     case D3DFMT_R3G3B2:       return SDL_PIXELFORMAT_RGB332;
     case D3DFMT_A1R5G5B5:     return SDL_PIXELFORMAT_ARGB1555;
-    case D3DFMT_X1R5G5B5:     return SDL_PIXELFORMAT_RGB555;
+    case D3DFMT_X1R5G5B5:     return SDL_PIXELFORMAT_XRGB1555;
     case D3DFMT_R5G6B5:       return SDL_PIXELFORMAT_RGB565;
     case D3DFMT_R8G8B8:       return SDL_PIXELFORMAT_RGB24;
-    case D3DFMT_X8R8G8B8:     return SDL_PIXELFORMAT_RGB888;
+    case D3DFMT_X8R8G8B8:     return SDL_PIXELFORMAT_XRGB8888;
     case D3DFMT_A8R8G8B8:     return SDL_PIXELFORMAT_ARGB8888;
     case D3DFMT_A2R10G10B10:  return SDL_PIXELFORMAT_ARGB2101010;
     default:
@@ -203,14 +207,24 @@ DRI3Present_SetPresentParameters( struct DRI3Present *This,
     }
     else {
         SDL_DisplayMode* mode = NULL;
-        SDL_DisplayMode curr;
+        //SDL_DisplayMode curr;
         int err;
         if (!pFullscreenDisplayMode) {
-            if (SDL_GetCurrentDisplayMode(0, &curr) < 0) {
+            SDL_DisplayID primaryID = SDL_GetPrimaryDisplay();
+
+            //if (SDL_GetCurrentDisplayMode(0, &curr) < 0) {
+            //    WARN("SDL_GetCurrentDisplayMode failed");
+            //   return D3DERR_INVALIDCALL;
+            //}
+            //mode = &curr;
+
+            if(!mode)
+            {
                 WARN("SDL_GetCurrentDisplayMode failed");
                return D3DERR_INVALIDCALL;
             }
-            mode = &curr;
+
+            mode = SDL_GetCurrentDisplayMode(primaryID);
         }
         else {
             SDL_DisplayMode target;
@@ -237,8 +251,8 @@ DRI3Present_SetPresentParameters( struct DRI3Present *This,
                  *       it returns different mode even when the request mode exits and works...
                  */
                 int Adapter = 0;
-                mode = SDL_GetClosestDisplayMode(Adapter, &target, &closest);
-                if (!mode) {
+                //mode = SDL_GetClosestDisplayMode(Adapter, &target, &closest);
+                if (!SDL_GetClosestFullscreenDisplayMode(0, target.w,target.h,target.refresh_rate, false, &closest)) {
                     WARN("Could not find requested fullscreen display mode (%dx%d %dHz, format = %d).\n", pFullscreenDisplayMode->Width, pFullscreenDisplayMode->Height, pFullscreenDisplayMode->RefreshRate, pFullscreenDisplayMode->Format);
                 }
             }
@@ -247,7 +261,8 @@ DRI3Present_SetPresentParameters( struct DRI3Present *This,
             }
         }
 
-        err = SDL_SetWindowDisplayMode(This->sdl_win, mode);
+        //err = SDL_SetWindowDisplayMode(This->sdl_win, mode);
+        err = SDL_SetWindowFullscreenMode(This->sdl_win, mode);
         if (err < 0) {
             WARN("SDL_SetWindowDisplayMode returned an error: %s\n", SDL_GetError());
             return D3DERR_INVALIDCALL;
@@ -367,7 +382,7 @@ static HRESULT WINAPI
 DRI3Present_GetRasterStatus( struct DRI3Present *This,
                              D3DRASTER_STATUS *pRasterStatus )
 {
-    FIXME("(%p, %p), stub!\n", This, pRasterStatus);
+    //FIXME("(%p, %p), stub!\n", This, pRasterStatus);
     return D3DERR_INVALIDCALL;
 }
 
@@ -377,17 +392,19 @@ DRI3Present_GetDisplayMode( struct DRI3Present *This,
                             D3DDISPLAYROTATION *pRotation )
 {
     int Adapter = 0;
-    SDL_DisplayMode mode;
-    int err = SDL_GetDesktopDisplayMode(Adapter, &mode);
-    if (err < 0) {
+    //SDL_DisplayMode *mode;
+    //int err = SDL_GetDesktopDisplayMode(Adapter, &mode);
+    SDL_DisplayMode *mode = SDL_GetDesktopDisplayMode(Adapter);
+    //if (err < 0) {
+    if(!mode) {
         WARN("SDL_GetCurrentDisplayMode returned an error: %s\n", SDL_GetError());
         return D3DERR_INVALIDCALL;
     }
 
-    pMode->Width = mode.w;
-    pMode->Height = mode.h;
-    pMode->RefreshRate = mode.refresh_rate;
-    pMode->Format = ConvertFromSDL(mode.format);
+    pMode->Width = mode->w;
+    pMode->Height = mode->h;
+    pMode->RefreshRate = mode->refresh_rate;
+    pMode->Format = ConvertFromSDL(mode->format);
     pMode->ScanLineOrdering = D3DSCANLINEORDERING_PROGRESSIVE;
 
     *pRotation = D3DDISPLAYROTATION_IDENTITY;
@@ -399,7 +416,7 @@ static HRESULT WINAPI
 DRI3Present_GetPresentStats( struct DRI3Present *This,
                              D3DPRESENTSTATS *pStats )
 {
-    FIXME("(%p, %p), stub!\n", This, pStats);
+    //FIXME("(%p, %p), stub!\n", This, pStats);
     return D3DERR_INVALIDCALL;
 }
 
@@ -407,7 +424,7 @@ static HRESULT WINAPI
 DRI3Present_GetCursorPos( struct DRI3Present *This,
                           POINT *pPoint )
 {
-    // FIXME faked
+    // //FIXME faked
     BOOL ok;
     if (!pPoint)
         return D3DERR_INVALIDCALL;
@@ -420,7 +437,7 @@ static HRESULT WINAPI
 DRI3Present_SetCursorPos( struct DRI3Present *This,
                           POINT *pPoint )
 {
-    // FIXME faked
+    // //FIXME faked
     if (!pPoint)
         return D3DERR_INVALIDCALL;
     return S_OK;
@@ -432,7 +449,7 @@ DRI3Present_SetCursor( struct DRI3Present *This,
                        POINT *pHotspot,
                        BOOL bShow )
 {
-    // FIXME faked
+    // //FIXME faked
    return D3D_OK;
 }
 
@@ -441,7 +458,7 @@ DRI3Present_SetGammaRamp( struct DRI3Present *This,
                           const D3DGAMMARAMP *pRamp,
                           HWND hWndOverride )
 {
-    // FIXME faked
+    // //FIXME faked
     return D3D_OK;
 }
 
@@ -514,13 +531,16 @@ DRI3Present_new( SDL_Window* sdl_win,
         return D3DERR_INVALIDCALL;
     }
 
-    SDL_SysWMinfo info;
-    SDL_VERSION(&info.version);
-    SDL_bool Ok = SDL_GetWindowWMInfo(sdl_win, &info);
-    if (!Ok) {
-        ERR("Invalid SDL_Window specified for presentation backend.\n");
-        return D3DERR_INVALIDCALL;
-    }
+//    SDL_SysWMinfo info;
+//    SDL_VERSION(&info.version);
+//    SDL_bool Ok = SDL_GetWindowWMInfo(sdl_win, &info);
+//    if (!Ok) {
+//        ERR("Invalid SDL_Window specified for presentation backend.\n");
+//        return D3DERR_INVALIDCALL;
+//    }
+
+    Display *xdisplay = (Display *)SDL_GetPointerProperty(SDL_GetWindowProperties(sdl_win), SDL_PROP_WINDOW_X11_DISPLAY_POINTER, NULL);
+    Window xwindow = (Window)SDL_GetNumberProperty(SDL_GetWindowProperties(sdl_win), SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
 
     This = calloc(1, sizeof(struct DRI3Present));
     if (!This) {
@@ -530,12 +550,15 @@ DRI3Present_new( SDL_Window* sdl_win,
     This->vtable = &DRI3Present_vtable;
     This->refs = 1;
     This->sdl_win = sdl_win;
-    This->x11_display = info.info.x11.display;
-    This->x11_window = info.info.x11.window;
+    //This->x11_display = info.info.x11.display;
+    This->x11_display = xdisplay;
+    //This->x11_window = info.info.x11.window;
+    This->x11_window = xwindow;
 
     DRI3Present_ChangePresentParameters(This, params, TRUE);
 
-    PRESENTInit(info.info.x11.display, &(This->present_priv));
+    //PRESENTInit(info.info.x11.display, &(This->present_priv));
+    PRESENTInit(xdisplay, &(This->present_priv));
 #if D3DADAPTER9_WITHDRI2
     if (is_dri2_fallback)
         DRI2FallbackInit(info.info.x11.display, &(This->dri2_priv));
@@ -608,7 +631,7 @@ DRI3PresentGroup_QueryInterface( struct DRI3PresentGroup *This,
 static UINT WINAPI
 DRI3PresentGroup_GetMultiheadCount( struct DRI3PresentGroup *This )
 {
-    FIXME("(%p), stub!\n", This);
+    //FIXME("(%p), stub!\n", This);
     return 1;
 }
 
@@ -632,7 +655,7 @@ DRI3PresentGroup_CreateAdditionalPresent( struct DRI3PresentGroup *This,
                                           D3DPRESENT_PARAMETERS *pPresentationParameters,
                                           ID3DPresent **ppPresent )
 {
-    FIXME("(%p, %p, %p), stub!\n", This, pPresentationParameters, ppPresent);
+    //FIXME("(%p, %p, %p), stub!\n", This, pPresentationParameters, ppPresent);
     return D3DERR_INVALIDCALL;
 }
 
@@ -778,7 +801,7 @@ static HRESULT WINAPI
 d3dadapter9_RegisterSoftwareDevice( struct d3dadapter9 *This,
                                     void *pInitializeFunction )
 {
-    FIXME("(%p, %p), stub!\n", This, pInitializeFunction);
+    //FIXME("(%p, %p), stub!\n", This, pInitializeFunction);
     return D3DERR_INVALIDCALL;
 }
 
@@ -818,18 +841,33 @@ d3dadapter9_GetAdapterModeCount( struct d3dadapter9 *This,
         return 0;
     }
 
-    int NumMatchingModes = 0;
-    int NumModes = SDL_GetNumDisplayModes(Adapter);
-    int i;
-    for (i=0;i<NumModes;i++) {
-        SDL_DisplayMode mode;
-        int err = SDL_GetDisplayMode(Adapter, i, &mode);
-        if (err < 0) {
-            WARN("SDL_GetDisplayMode returned an error: %s\n", SDL_GetError());
-            return 0;
-        }
+//    int NumMatchingModes = 0;
+//    int NumModes = SDL_GetNumDisplayModes(Adapter);
+//    int i;
+//    for (i=0;i<NumModes;i++) {
+//        SDL_DisplayMode mode;
+//        int err = SDL_GetDisplayMode(Adapter, i, &mode);
+//        if (err < 0) {
+//            WARN("SDL_GetDisplayMode returned an error: %s\n", SDL_GetError());
+//            return 0;
+//        }
+//
+//        if (Format == ConvertFromSDL(mode.format))
+//            NumMatchingModes ++;
+//    }
 
-        if (Format == ConvertFromSDL(mode.format))
+    int NumMatchingModes = 0;
+    int NumModes;
+
+    SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(Adapter, &NumModes);
+    if (!modes) {
+        WARN("SDL_GetFullscreenDisplayModes returned an error: %s\n", SDL_GetError());
+        return 0;
+    }
+
+    for (int m = 0; m < NumModes; m++)
+    {
+        if (Format == ConvertFromSDL(modes[m]->format))
             NumMatchingModes ++;
     }
 
@@ -862,29 +900,56 @@ d3dadapter9_EnumAdapterModes( struct d3dadapter9 *This,
         return hr;
     }
 
-    int IndexMatchingModes = 0;
-    int NumModes = SDL_GetNumDisplayModes(Adapter);
-    int i;
-    for (i=0;i<NumModes;i++) {
-        SDL_DisplayMode mode;
-        int err = SDL_GetDisplayMode(Adapter, i, &mode);
-        if (err < 0) {
-            WARN("SDL_GetDisplayMode returned an error: %s\n", SDL_GetError());
-            return D3DERR_INVALIDCALL;
-        }
+//    int IndexMatchingModes = 0;
+//    int NumModes = SDL_GetNumDisplayModes(Adapter);
+//    int i;
+//    for (i=0;i<NumModes;i++) {
+//        SDL_DisplayMode mode;
+//        int err = SDL_GetDisplayMode(Adapter, i, &mode);
+//        if (err < 0) {
+//            WARN("SDL_GetDisplayMode returned an error: %s\n", SDL_GetError());
+//            return D3DERR_INVALIDCALL;
+//        }
+//
+//        if (Format != ConvertFromSDL(mode.format))
+//            continue;
+//
+//        if (IndexMatchingModes == ModeIndex) {
+//            TRACE("DiplayMode: %dx%d@%dHz, d3dformat=%d\n", mode.w, mode.h, mode.refresh_rate, Format);
+//            pMode->Width = mode.w;
+//            pMode->Height = mode.h;
+//            pMode->RefreshRate = mode.refresh_rate;
+//            pMode->Format = Format;
+//
+//            return D3D_OK;
+//        }
+//        IndexMatchingModes ++;
+//    }
 
-        if (Format != ConvertFromSDL(mode.format))
+    int IndexMatchingModes = 0;
+    int NumModes;
+
+    SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(Adapter, &NumModes);
+    if (!modes) {
+        WARN("SDL_GetFullscreenDisplayModes returned an error: %s\n", SDL_GetError());
+        return 0;
+    }
+
+    for (int m = 0; m < NumModes; m++)
+    {
+        if (Format == ConvertFromSDL(modes[m]->format))
             continue;
 
-        if (IndexMatchingModes == ModeIndex) {
-            TRACE("DiplayMode: %dx%d@%dHz, d3dformat=%d\n", mode.w, mode.h, mode.refresh_rate, Format);
-            pMode->Width = mode.w;
-            pMode->Height = mode.h;
-            pMode->RefreshRate = mode.refresh_rate;
+            if (IndexMatchingModes == ModeIndex) {
+            TRACE("DiplayMode: %dx%d@%dHz, d3dformat=%d\n", modes[m]->w, modes[m]->h, modes[m]->refresh_rate, Format);
+            pMode->Width = modes[m]->w;
+            pMode->Height = modes[m]->h;
+            pMode->RefreshRate = modes[m]->refresh_rate;
             pMode->Format = Format;
 
             return D3D_OK;
         }
+        
         IndexMatchingModes ++;
     }
 
@@ -902,17 +967,25 @@ d3dadapter9_GetAdapterDisplayMode( struct d3dadapter9 *This,
         return D3DERR_INVALIDCALL;
     }
 
-    SDL_DisplayMode mode;
-    int err = SDL_GetCurrentDisplayMode(Adapter, &mode);
-    if (err < 0) {
+    //SDL_DisplayMode mode;
+    //int err = SDL_GetCurrentDisplayMode(Adapter, &mode);
+    //if (err < 0) {
+    //    WARN("SDL_GetCurrentDisplayMode returned an error: %s\n", SDL_GetError());
+    //    return D3DERR_INVALIDCALL;
+    //}
+
+    SDL_DisplayMode *mode = SDL_GetDesktopDisplayMode(Adapter);
+    //if (err < 0) {
+    if(!mode) {
         WARN("SDL_GetCurrentDisplayMode returned an error: %s\n", SDL_GetError());
         return D3DERR_INVALIDCALL;
     }
 
-    pMode->Width = mode.w;
-    pMode->Height = mode.h;
-    pMode->RefreshRate = mode.refresh_rate;
-    pMode->Format = ConvertFromSDL(mode.format);
+
+    pMode->Width = mode->w;
+    pMode->Height = mode->h;
+    pMode->RefreshRate = mode->refresh_rate;
+    pMode->Format = ConvertFromSDL(mode->format);
 
     return D3D_OK;
 }
@@ -1007,7 +1080,7 @@ static HMONITOR WINAPI
 d3dadapter9_GetAdapterMonitor( struct d3dadapter9 *This,
                                UINT Adapter )
 {
-    // FIXME faked
+    // //FIXME faked
     if (Adapter >= d3dadapter9_GetAdapterCount(This)) { return (HMONITOR)0; }
     return (HMONITOR)0;;
 }
@@ -1056,7 +1129,7 @@ d3dadapter9_EnumAdapterModesEx( struct d3dadapter9 *This,
                                 UINT Mode,
                                 D3DDISPLAYMODEEX *pMode )
 {
-    FIXME("(%p, %u, %p, %u, %p), stub!\n", This, Adapter, pFilter, Mode, pMode);
+    //FIXME("(%p, %u, %p, %u, %p), stub!\n", This, Adapter, pFilter, Mode, pMode);
     return D3DERR_INVALIDCALL;
 }
 
@@ -1066,7 +1139,7 @@ d3dadapter9_GetAdapterDisplayModeEx( struct d3dadapter9 *This,
                                      D3DDISPLAYMODEEX *pMode,
                                      D3DDISPLAYROTATION *pRotation )
 {
-    FIXME("(%p, %u, %p, %p), stub!\n", This, Adapter, pMode, pRotation);
+    //FIXME("(%p, %u, %p, %p), stub!\n", This, Adapter, pMode, pRotation);
     return D3DERR_INVALIDCALL;
 }
 
@@ -1131,7 +1204,7 @@ d3dadapter9_GetAdapterLUID( struct d3dadapter9 *This,
                             UINT Adapter,
                             LUID *pLUID )
 {
-    FIXME("(%p, %u, %p), stub!\n", This, Adapter, pLUID);
+    //FIXME("(%p, %u, %p), stub!\n", This, Adapter, pLUID);
     return D3DERR_INVALIDCALL;
 }
 
@@ -1160,12 +1233,16 @@ static IDirect3D9ExVtbl d3dadapter9_vtable = {
     (void *)d3dadapter9_GetAdapterLUID
 };
 
+#include <stdlib.h>
+
 HRESULT
 d3dadapter9_new( BOOL ex, Display *dpy,
                  IDirect3D9Ex **ppOut )
 {
     static void * WINAPI (*pD3DAdapter9GetProc)(const char *) = NULL;
     static BOOL StaticInitDone = FALSE;
+
+    init_dri3();
 
     // load dynamic library and retrieve "D3DAdapter9GetProc" symbol.
     if (!StaticInitDone) {
@@ -1278,19 +1355,21 @@ d3dadapter9_new( BOOL ex, Display *dpy,
     This->adapter = adapter;
 
     *ppOut = (IDirect3D9Ex *)This;
-    FIXME("\033[1;32m\nNative Direct3D 9 is active.\033[0m\n");
+    //FIXME("\033[1;32m\nNative Direct3D 9 is active.\033[0m\n");
     return D3D_OK;
 }
 
 
 // --------------------------------------------------------------------
-
+typedef Display* (*PFN_XOpenDisplay)(const char*);
+extern PFN_XOpenDisplay XOpenDisplay_dyn;
 static HRESULT SDL_Direct3DCreate9Ex_common(BOOL ex, UINT SDKVersion,
                                             IDirect3D9Ex **ppD3D9Ex )
 {
-    SDL_SysWMinfo info;
-    SDL_VERSION(&info.version);
-    Display *dpy = XOpenDisplay(NULL);
+    //SDL_SysWMinfo info;
+    //SDL_VERSION(&info.version);
+    //Display *dpy = XOpenDisplay(NULL);
+    Display *dpy = XOpenDisplay_dyn(NULL);
     HRESULT hr = d3dadapter9_new( ex, dpy, ppD3D9Ex );
 
     return hr;
@@ -1298,16 +1377,19 @@ static HRESULT SDL_Direct3DCreate9Ex_common(BOOL ex, UINT SDKVersion,
 
 static IDirect3D9Ex* SDL_Direct3DCreate9Ex_commonex(BOOL ex, SDL_Window *win )
 {
-    SDL_SysWMinfo info;
-    SDL_VERSION(&info.version);
-    SDL_bool Ok = SDL_GetWindowWMInfo(win, &info);
-    if (!Ok) {
-        ERR("SDL_GetWindowWMInfo failed.");
-        return NULL;
-    }
+    //SDL_SysWMinfo info;
+    //SDL_VERSION(&info.version);
+    //SDL_bool Ok = SDL_GetWindowWMInfo(win, &info);
+    //if (!Ok) {
+    //    ERR("SDL_GetWindowWMInfo failed.");
+    //    return NULL;
+    //}
+
+    Display *xdisplay = (Display *)SDL_GetPointerProperty(SDL_GetWindowProperties(win), SDL_PROP_WINDOW_X11_DISPLAY_POINTER, NULL);
+    //Window xwindow = (Window)SDL_GetNumberProperty(SDL_GetWindowProperties(win), SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
 
     IDirect3D9Ex *pD3D9Ex = NULL;
-    HRESULT hr = d3dadapter9_new( ex, info.info.x11.display, &pD3D9Ex );
+    HRESULT hr = d3dadapter9_new( ex, xdisplay, &pD3D9Ex );
     if (FAILED(hr)) {
         return NULL;
     }
